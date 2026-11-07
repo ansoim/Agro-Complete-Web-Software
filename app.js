@@ -82,10 +82,7 @@ function renderEmployee(){
  const ranked=activePeople().map(person=>{
   const personEntries=published.filter(e=>e.person===person.name);
   const actual=baselineForPerson(m,person)+personEntries.reduce((sum,e)=>sum+Number(e.value||0),0);
-  const closed=personEntries.filter(e=>!e.status||/closed|done|won/i.test(e.status)).length;
-  const awaiting=personEntries.filter(e=>/await|feedback|follow/i.test(e.status||'')).length;
-  const open=personEntries.filter(e=>/open|planned|progress|active/i.test(e.status||'')).length;
-  return {...person,actual,entries:personEntries.length,closed,awaiting,open};
+  return {...person,actual};
  }).sort((a,b)=>b.actual-a.actual);
  const totalSales=baselineTotal(m)+published.reduce((sum,e)=>sum+Number(e.value||0),0), target=teamTarget||0, achieved=target?totalSales/target*100:0, remaining=Math.max(0,target-totalSales);
  const date=new Date(m+'-01T00:00:00');
@@ -97,10 +94,8 @@ function renderEmployee(){
  $('#employeeTeamTarget').textContent=employeeFmt(target);$('#employeeTeamAchieved').innerHTML=`Sales achieved: <strong>${employeeFmt(totalSales)} / ${employeeFmt(target)} FCFA</strong>`;
  $('#employeeTargetRemaining').textContent=`${employeeFmt(remaining)} FCFA`;$('#employeeTargetLeftPercent').textContent=`${target?(remaining/target*100).toFixed(1):'0.0'}%`;
  $('#employeeTargetQuote').textContent=achieved>=100?'Target achieved! We super achieved our target! 🏆':achieved>=75?'Just a bit more to go — you’ve got this!':achieved>=50?'We’re on fire! Keep pushing!':achieved>=25?'Halfway there — keep the momentum!':'Great start! Let’s get moving!';
- const sortKey=$('#employeeSort')?.value||'sales';const sorted=[...ranked].sort((a,b)=>sortKey==='sales'?b.actual-a.actual:sortKey==='closed'?b.closed-a.closed||b.actual-a.actual:b.entries-a.entries||b.actual-a.actual);
- $('#employeeLeaderboardRows').innerHTML=sorted.map((p,i)=>`<tr><td><span class="employee-rank-pill">${String(i+1).padStart(2,'0')}</span></td><td class="employee-person">${p.name}${p.name===user.name?' (You)':''}<div class="employee-mini-bar"><i style="width:${Math.min(100,totalSales?p.actual/Math.max(1,...ranked.map(x=>x.actual))*100:0)}%"></i></div></td><td>${employeeFmt(p.entries)}</td><td>${employeeFmt(p.closed)}</td><td><strong>${employeeFmt(p.actual)}</strong></td></tr>`).join('');
+ $('#employeeLeaderboardRows').innerHTML=ranked.map((p,i)=>`<tr><td><span class="employee-rank-pill">${String(i+1).padStart(2,'0')}</span></td><td class="employee-person">${p.name}${p.name===user.name?' (You)':''}<div class="employee-mini-bar"><i style="width:${Math.min(100,totalSales?p.actual/Math.max(1,...ranked.map(x=>x.actual))*100:0)}%"></i></div></td><td><strong>${employeeFmt(p.actual)}</strong></td></tr>`).join('');
 }
-$('#employeeSort').addEventListener('change',renderEmployee);
 
 function editEntry(id){const entry=entries.find(e=>String(e.id)===String(id));if(!entry)return;editingEntryId=entry.id;showPage('entry');$('#saleDate').value=entry.date;$('#salesperson').value=entry.person;$('#saleReference').value=entry.ref||'';$('#salesRows').innerHTML='';addProductRow(entry);$('#salesForm button[type="submit"]').innerHTML='Update sales entry <span>→</span>';$('#salesForm').scrollIntoView({behavior:'smooth',block:'start'})}
 function renderTeam(){const rows=$('#teamRows');if(!rows)return;rows.innerHTML=[...people].map(p=>`<tr><td><b>${p.name}</b></td><td>${p.region||'—'}</td><td>${employeeFmt(baselineForPerson(snapshotMonth,p))} FCFA</td><td><span class="status-pill ${p.active===false?'status-draft':'status-live'}">${p.active===false?'Removed':'Active'}</span></td><td><div class="team-actions"><button class="download-btn toggle-person" data-id="${p.id}">${p.active===false?'Restore':'Remove'}</button><button class="delete-person" type="button" data-id="${p.id}" aria-label="Permanently delete ${p.name}" title="Permanently delete employee">×</button></div></td></tr>`).join('');$$('.toggle-person').forEach(b=>b.addEventListener('click',()=>{const person=people.find(p=>String(p.id)===b.dataset.id);if(!person)return;person.active=person.active===false;save();fillSalespeople();renderTeam();renderAll();toast(person.active?'Salesperson restored':'Salesperson removed from active list')}));$$('.delete-person').forEach(b=>b.addEventListener('click',()=>{const person=people.find(p=>String(p.id)===b.dataset.id);if(!person||!confirm(`Permanently remove ${person.name} from the sales team? Their existing sales records and November snapshot totals will be kept.`))return;people=people.filter(p=>p.id!==person.id);save();fillSalespeople();renderTeam();renderAll();toast('Salesperson permanently removed from the team')}))}
