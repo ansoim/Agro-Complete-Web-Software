@@ -30,3 +30,9 @@
 .chart-point-animated{opacity:0;animation:chartPointEnter .28s ease var(--point-delay) forwards}
 @keyframes chartPointEnter{to{opacity:1}}
 @media(prefers-reduced-motion:reduce){.chart-point-animated{animation:none;opacity:1}}
+.period-control{flex-wrap:wrap}
+.period-control #overviewMonth{min-width:120px}
+.period-control #overviewYear{min-width:92px}
+.employee-leader-scroll{position:relative;isolation:isolate;overscroll-behavior:contain}
+.employee-leader-table{border-collapse:separate;border-spacing:0}
+.employee-leader-table thead th{top:0;z-index:5;background:#143034;box-shadow:0 2px 0 #ffffff20}

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261108-dashboard-logic">
+  <link rel="stylesheet" href="styles.css?v=20261109-dashboard-selection">
 </head>
 <body>
   <div id="loginView" class="login-shell">
@@ -31,7 +31,7 @@
           <label for="loginEmail">Email or employee ID</label>
           <input id="loginEmail" type="text" placeholder="e.g. employee@tropica.com" value="employee@tropica.com" required>
           <label for="loginPassword">Password</label>
-          <div class="password-wrap"><input id="loginPassword" type="password" placeholder="Enter password" required><button type="button" class="show-pass" id="togglePassword">Show</button></div>
+          <div class="password-wrap"><input id="loginPassword" type="password" placeholder="Please enter your Password" required><button type="button" class="show-pass" id="togglePassword">Show</button></div>
           <button class="btn btn-primary full" type="submit">Sign in <span>→</span></button>
         </form>
         <div class="login-or"><span></span>OR<span></span></div>
@@ -56,7 +56,6 @@
         <button class="nav-item active" data-page="employee"><span class="nav-icon">◫</span>My Dashboard</button>
       </nav>
       <div class="sidebar-bottom">
-        <div class="sidebar-help"><span class="help-icon">?</span><div><b>Need help?</b><small>Contact your administrator</small></div></div>
         <button class="nav-item logout" id="logoutBtn"><span class="nav-icon">↪</span>Logout</button>
       </div>
     </aside>
@@ -72,7 +71,7 @@
       </header>
 
       <section id="overviewPage" class="page active">
-        <div class="welcome-row"><div><span class="eyebrow">BUSINESS SNAPSHOT</span><h1>Good morning, <span id="welcomeName">Jaykishan</span> <span class="wave">✳</span></h1><p class="muted">Here’s what’s happening across your sales team.</p></div><div class="period-control"><span>Reporting period</span><select id="overviewMonth"></select></div></div>
+        <div class="welcome-row"><div><span class="eyebrow">BUSINESS SNAPSHOT</span><h1>Good morning, <span id="welcomeName">Jaykishan</span> <span class="wave">✳</span></h1><p class="muted">Here’s what’s happening across your sales team.</p></div>        <div class="period-control"><span>Reporting period</span><select id="overviewMonth" aria-label="Reporting month"></select><select id="overviewYear" aria-label="Reporting year"></select></div></div>
         <div class="stat-grid">
           <article class="stat-card"><div class="stat-top"><span>Total sales</span><span class="stat-icon green">₣</span></div><div class="stat-value" id="totalSales">—</div><div class="stat-foot"><span class="positive" id="totalSalesPeriodLabel">Selected month</span><span>snapshot + published sales</span></div></article>
           <article class="stat-card"><div class="stat-top"><span>Team target</span><span class="stat-icon blue">◎</span></div><div class="stat-value" id="teamTarget">—</div><div class="stat-foot"><span class="neutral" id="targetProgress">—</span><span>monthly goal</span></div></article>
@@ -164,7 +163,7 @@
   </div>
   <div id="toast" class="toast" role="status"></div>
   <dialog id="adminProfileDialog" class="profile-dialog"><form id="adminProfileForm"><button class="dialog-close" type="button" id="adminProfileClose" aria-label="Close">×</button><span class="eyebrow">ADMIN PROFILE</span><h2>Administrator details</h2><label for="adminProfileName">Display name</label><input id="adminProfileName" required><label for="adminProfilePhoto">Profile photo</label><input id="adminProfilePhoto" type="file" accept="image/*"><img id="adminPhotoPreview" alt="Profile photo preview" class="admin-photo-preview hidden"><div class="profile-actions"><button class="btn btn-outline" type="button" id="removeAdminPhoto">Remove photo</button><button class="btn btn-primary" type="submit">Save profile</button></div></form></dialog>
-  <script src="app.js?v=20261108-dashboard-logic"></script>
-  <script type="module" src="assets/employee-trophies.js?v=20261108-dashboard-logic"></script>
+  <script src="app.js?v=20261109-dashboard-selection"></script>
+  <script type="module" src="assets/employee-trophies.js?v=20261109-dashboard-selection"></script>
 </body>
 </html>
