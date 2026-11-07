@@ -69,16 +69,20 @@ function createSoftwareView(el,rank){
  const draw=()=>{if(!w)return;ctx.clearRect(0,0,w,h);rot.makeRotationY(model.rotation.y);view.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);const faces=[];for(const t of triangles){const normal=new THREE.Vector3();const pts=t.v.map(a=>{v.copy(a.p).applyMatrix4(rot);n.copy(a.n).transformDirection(rot);normal.add(n);projected.copy(v).applyMatrix4(view);return{x:(projected.x*.5+.5)*w,y:(-.5*projected.y+.5)*h,z:projected.z}});normal.normalize();if(normal.z<-.3)continue;const diffuse=Math.max(0,normal.dot(light));const spec=Math.pow(Math.max(0,normal.dot(light)),34)*1.7+Math.pow(Math.max(0,normal.dot(sideLight)),65)*1.3;const reflection=.29+diffuse*.68+Math.max(0,normal.dot(sideLight))*.22;const rgb=[t.c.r,t.c.g,t.c.b].map(c=>Math.min(255,Math.round(255*(c*reflection+spec*(t.black?.18:.65)))));faces.push({pts,z:(pts[0].z+pts[1].z+pts[2].z)/3,color:`rgb(${rgb.join(',')})`})}faces.sort((a,b)=>b.z-a.z);for(const f of faces){ctx.beginPath();ctx.moveTo(f.pts[0].x,f.pts[0].y);ctx.lineTo(f.pts[1].x,f.pts[1].y);ctx.lineTo(f.pts[2].x,f.pts[2].y);ctx.closePath();ctx.fillStyle=f.color;ctx.fill();ctx.strokeStyle=f.color;ctx.lineWidth=.45;ctx.stroke()}};
  const resize=()=>{w=canvas.width=Math.round(holder.clientWidth*1.3);h=canvas.height=Math.round(holder.clientHeight*1.3);camera.aspect=w/h;camera.updateProjectionMatrix();draw()};new ResizeObserver(resize).observe(holder);resize();el.classList.add('has-3d');views.push({model,phase:rank*.13,draw});
 }
-function initializeTrophies(){
- for(const [className,rank] of [['first',1],['second',2],['third',3]]){
-  const el=document.querySelector('.winner.'+className);
-  if(!el)continue;
-  try{createView(el,rank)}catch(e){
-   console.error(`[Tropica trophy] ${['','1st gold','2nd silver','3rd bronze'][rank]} Three.js/WebGL renderer failed; using the emergency 2D canvas fallback.`,e);
-   try{createSoftwareView(el,rank)}catch(fallbackError){console.error(`[Tropica trophy] ${['','1st','2nd','3rd'][rank]} fallback also failed.`,fallbackError)}
+function initializeWhenPodiumReady() {
+  if (document.querySelector('.employee-winner')) {
+    initializeTrophies();
   }
- }
 }
-if(document.documentElement.dataset.dashboardReady==='true')initializeTrophies();
-else document.addEventListener('tropica:data-ready',initializeTrophies,{once:true});
+
+initializeWhenPodiumReady();
+document.addEventListener(
+  'tropica:employee-podium-updated',
+  initializeWhenPodiumReady
+);
+document.addEventListener(
+  'tropica:data-ready',
+  initializeWhenPodiumReady,
+  { once: true }
+);
 let last=0,angle=0;function tick(t){requestAnimationFrame(tick);if(document.hidden){last=t;return}if(t-last<50)return;const dt=Math.min((t-last)/1000,.1);last=t;const paused=document.body.classList.contains('motion-paused')||reduced.matches;if(!paused)angle+=dt*Math.PI*2/26;for(const v of views){if(!paused)v.model.rotation.y=angle+v.phase;v.draw?v.draw():v.renderer.render(v.scene,v.camera)}}requestAnimationFrame(tick);
