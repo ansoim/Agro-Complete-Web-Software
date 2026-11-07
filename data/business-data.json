@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "description": "Tropica Agro business data master. The November figures are an aggregate screenshot snapshot, not individual transactions.",
+  "currency": "XOF",
+  "businessTimezone": "Africa/Abidjan",
+  "salespeople": [
+    { "id": "sp-blin", "name": "BLIN COMM", "region": null, "active": true },
+    { "id": "sp-kouasi", "name": "KOUASI COMM", "region": null, "active": true },
+    { "id": "sp-iro", "name": "IRO COMM", "region": null, "active": true },
+    { "id": "sp-toukpa", "name": "TOUKPA COMM", "region": null, "active": true },
+    { "id": "sp-ange", "name": "ANGE COMM", "region": null, "active": true },
+    { "id": "sp-nguessan", "name": "N'GUESSAN COMM", "region": null, "active": true },
+    { "id": "sp-jean-luc", "name": "JEAN LUC COMM", "region": null, "active": true },
+    { "id": "sp-sylla", "name": "SYLLA COMM", "region": null, "active": true }
+  ],
+  "salesEntries": [],
+  "salesSnapshots": [
+    { "month": "2026-11", "salespersonId": "sp-blin", "amount": 0 },
+    { "month": "2026-11", "salespersonId": "sp-kouasi", "amount": 0 },
+    { "month": "2026-11", "salespersonId": "sp-iro", "amount": 0 },
+    { "month": "2026-11", "salespersonId": "sp-toukpa", "amount": 3059000 },
+    { "month": "2026-11", "salespersonId": "sp-ange", "amount": 2500000 },
+    { "month": "2026-11", "salespersonId": "sp-nguessan", "amount": 770000 },
+    { "month": "2026-11", "salespersonId": "sp-jean-luc", "amount": 0 },
+    { "month": "2026-11", "salespersonId": "sp-sylla", "amount": 0 }
+  ],
+  "monthlyTargets": [ { "month": "2026-11", "teamTarget": 70000000, "source": "Attached employee dashboard snapshot" } ],
+  "users": [ { "id": "admin-jaykishan", "displayName": "Jaykishan Tolani", "role": "admin", "active": true } ]
+}
