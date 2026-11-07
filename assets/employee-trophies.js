@@ -32,21 +32,29 @@ function buildTrophy(color){
  return g;
 }
 function createView(el,rank){
- const renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});
+ let stage='WebGL context creation';
+ let renderer,holder;
+ try{
+ renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});
+ renderer.debug.checkShaderErrors=true;
+ stage='renderer configuration';
  renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));renderer.setClearColor(0,0);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;
  const scene=new THREE.Scene();
  // Photographic studio reflection panels create moving highlights on real metal.
  const studio=new THREE.Scene();studio.background=new THREE.Color(0x1b211e);
  function softbox(x,y,z,w,h,power){const p=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color:new THREE.Color(power,power*.97,power*.88),side:THREE.DoubleSide}));p.position.set(x,y,z);p.lookAt(0,1.8,0);studio.add(p)}
  softbox(-4,4,3,2.8,7,7);softbox(4,3,2,1.2,6,5);softbox(0,7,-1,5,3,6);softbox(1,2,-5,2,5,4);softbox(-1,1,5,.6,5,2);
- const pmrem=new THREE.PMREMGenerator(renderer);const env=pmrem.fromScene(studio,.04);scene.environment=env.texture;pmrem.dispose();
+ stage='studio reflection environment generation';
+ const pmrem=new THREE.PMREMGenerator(renderer);let env;try{env=pmrem.fromScene(studio,.04);scene.environment=env.texture}finally{pmrem.dispose()}
  const camera=new THREE.PerspectiveCamera(33,1,.1,100);camera.position.set(0,3.6,8.5);camera.lookAt(0,1.9,0);
  scene.add(new THREE.HemisphereLight(0xfff6dc,0x21392b,1.4));const light=new THREE.DirectionalLight(0xfff3cf,3);light.position.set(-3,5,4);scene.add(light);
  const model=buildTrophy(rank===1?0xe8b749:rank===2?0xc3d3df:0xc98b56);model.rotation.y=-.22;scene.add(model);
- const holder=document.createElement('div');holder.className='trophy-3d';holder.setAttribute('role','img');holder.setAttribute('aria-label',`${['','Gold','Silver','Bronze'][rank]} trophy, rotating in 3D`);holder.append(renderer.domElement);el.querySelector('.employee-trophy').insertAdjacentElement('afterend',holder);
- const resize=()=>{const w=holder.clientWidth,h=holder.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();renderer.render(scene,camera)};
- const observer=new ResizeObserver(resize);observer.observe(holder);resize();el.classList.add('has-3d');
- views.push({renderer,scene,camera,model,phase:rank*.13,holder,observer});
+ holder=document.createElement('div');holder.className='trophy-3d';holder.setAttribute('role','img');holder.setAttribute('aria-label',`${['','Gold','Silver','Bronze'][rank]} trophy, rotating in 3D`);holder.append(renderer.domElement);el.querySelector('.trophy').insertAdjacentElement('afterend',holder);
+ stage='initial trophy render';
+ const resize=()=>{const w=holder.clientWidth,h=holder.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();renderer.render(scene,camera)};
+ new ResizeObserver(resize).observe(holder);resize();el.classList.add('has-3d');
+ views.push({renderer,scene,camera,model,phase:rank*.13});
+ }catch(error){renderer?.dispose();holder?.remove();throw new Error(`Trophy ${rank} failed during ${stage}`,{cause:error})}
 }
 
 function createSoftwareView(el,rank){
@@ -54,16 +62,23 @@ function createSoftwareView(el,rank){
  const triangles=[];const v=new THREE.Vector3(),n=new THREE.Vector3();
  model.traverse(mesh=>{if(!mesh.isMesh)return;const geo=mesh.geometry,pos=geo.attributes.position,norm=geo.attributes.normal,indices=geo.index;const normalMat=new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);const verts=[];for(let i=0;i<pos.count;i++){v.fromBufferAttribute(pos,i).applyMatrix4(mesh.matrixWorld);n.fromBufferAttribute(norm,i).applyMatrix3(normalMat).normalize();verts.push({p:v.clone(),n:n.clone()})}const base=mesh.material.color.clone().convertLinearToSRGB();for(let i=0;i<(indices?indices.count:pos.count);i+=3){const ids=[0,1,2].map(j=>indices?indices.getX(i+j):i+j);triangles.push({v:ids.map(k=>verts[k]),c:base,black:base.r<.2})}});
  const holder=document.createElement('div');holder.className='trophy-3d';holder.setAttribute('role','img');holder.setAttribute('aria-label',`${['','Gold','Silver','Bronze'][rank]} trophy, rotating in 3D`);
- const canvas=document.createElement('canvas');holder.append(canvas);el.querySelector('.employee-trophy').insertAdjacentElement('afterend',holder);const ctx=canvas.getContext('2d');
+ const canvas=document.createElement('canvas');holder.append(canvas);el.querySelector('.trophy').insertAdjacentElement('afterend',holder);const ctx=canvas.getContext('2d');
  const camera=new THREE.PerspectiveCamera(33,1,.1,100);camera.position.set(0,3.6,8.5);camera.lookAt(0,1.9,0);camera.updateMatrixWorld();
  let w=0,h=0;const rot=new THREE.Matrix4();const view=new THREE.Matrix4();const projected=new THREE.Vector3();
  const light=new THREE.Vector3(-.5,.8,1).normalize(),sideLight=new THREE.Vector3(.9,.3,.5).normalize();
  const draw=()=>{if(!w)return;ctx.clearRect(0,0,w,h);rot.makeRotationY(model.rotation.y);view.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);const faces=[];for(const t of triangles){const normal=new THREE.Vector3();const pts=t.v.map(a=>{v.copy(a.p).applyMatrix4(rot);n.copy(a.n).transformDirection(rot);normal.add(n);projected.copy(v).applyMatrix4(view);return{x:(projected.x*.5+.5)*w,y:(-.5*projected.y+.5)*h,z:projected.z}});normal.normalize();if(normal.z<-.3)continue;const diffuse=Math.max(0,normal.dot(light));const spec=Math.pow(Math.max(0,normal.dot(light)),34)*1.7+Math.pow(Math.max(0,normal.dot(sideLight)),65)*1.3;const reflection=.29+diffuse*.68+Math.max(0,normal.dot(sideLight))*.22;const rgb=[t.c.r,t.c.g,t.c.b].map(c=>Math.min(255,Math.round(255*(c*reflection+spec*(t.black?.18:.65)))));faces.push({pts,z:(pts[0].z+pts[1].z+pts[2].z)/3,color:`rgb(${rgb.join(',')})`})}faces.sort((a,b)=>b.z-a.z);for(const f of faces){ctx.beginPath();ctx.moveTo(f.pts[0].x,f.pts[0].y);ctx.lineTo(f.pts[1].x,f.pts[1].y);ctx.lineTo(f.pts[2].x,f.pts[2].y);ctx.closePath();ctx.fillStyle=f.color;ctx.fill();ctx.strokeStyle=f.color;ctx.lineWidth=.45;ctx.stroke()}};
- const resize=()=>{w=canvas.width=Math.round(holder.clientWidth*1.3);h=canvas.height=Math.round(holder.clientHeight*1.3);camera.aspect=w/h;camera.updateProjectionMatrix();draw()};const observer=new ResizeObserver(resize);observer.observe(holder);resize();el.classList.add('has-3d');views.push({model,phase:rank*.13,draw,holder,observer});
+ const resize=()=>{w=canvas.width=Math.round(holder.clientWidth*1.3);h=canvas.height=Math.round(holder.clientHeight*1.3);camera.aspect=w/h;camera.updateProjectionMatrix();draw()};new ResizeObserver(resize).observe(holder);resize();el.classList.add('has-3d');views.push({model,phase:rank*.13,draw});
 }
 function initializeTrophies(){
- for(const view of views){view.observer?.disconnect();view.renderer?.dispose();view.holder?.remove()}views.length=0;
- for(const [className,rank] of [['first',1],['second',2],['third',3]]){const el=document.querySelector('.employee-winner.'+className);if(!el||el.querySelector('.trophy-3d'))continue;try{createView(el,rank)}catch(e){console.info('Using software 3D renderer.');try{createSoftwareView(el,rank)}catch(fallbackError){console.warn('Trophy fallback unavailable',fallbackError)}}}
+ for(const [className,rank] of [['first',1],['second',2],['third',3]]){
+  const el=document.querySelector('.winner.'+className);
+  if(!el)continue;
+  try{createView(el,rank)}catch(e){
+   console.error(`[Tropica trophy] ${['','1st gold','2nd silver','3rd bronze'][rank]} Three.js/WebGL renderer failed; using the emergency 2D canvas fallback.`,e);
+   try{createSoftwareView(el,rank)}catch(fallbackError){console.error(`[Tropica trophy] ${['','1st','2nd','3rd'][rank]} fallback also failed.`,fallbackError)}
+  }
+ }
 }
-initializeTrophies();document.addEventListener('tropica:employee-podium-updated',initializeTrophies);
+if(document.documentElement.dataset.dashboardReady==='true')initializeTrophies();
+else document.addEventListener('tropica:data-ready',initializeTrophies,{once:true});
 let last=0,angle=0;function tick(t){requestAnimationFrame(tick);if(document.hidden){last=t;return}if(t-last<50)return;const dt=Math.min((t-last)/1000,.1);last=t;const paused=document.body.classList.contains('motion-paused')||reduced.matches;if(!paused)angle+=dt*Math.PI*2/26;for(const v of views){if(!paused)v.model.rotation.y=angle+v.phase;v.draw?v.draw():v.renderer.render(v.scene,v.camera)}}requestAnimationFrame(tick);
