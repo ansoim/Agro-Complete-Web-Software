@@ -8,10 +8,10 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
     function isAdmin() {
-      return signedIn() && profile().role == 'admin' && profile().active != false;
+      return signedIn() && profile().role == 'admin' && profile().active == true;
     }
     function isActiveEmployee() {
-      return signedIn() && profile().role == 'employee' && profile().active != false;
+      return signedIn() && profile().role == 'employee' && profile().active == true;
     }
     function canReadBusinessData() {
       return isAdmin() || isActiveEmployee();
