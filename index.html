@@ -10,10 +10,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body> <div id="authLoading" class="auth-loading" role="status" aria-live="polite">
-  <span class="auth-loading-spinner" aria-hidden="true"></span>
-  <span>Checking your sign-in…</span>
-</div>
+<body>
+  <div id="authLoading" class="auth-loading" role="status" aria-live="polite">
+    <span class="auth-loading-spinner" aria-hidden="true"></span>
+    <span>Checking your sign-in…</span>
+  </div>
   <div id="loginView" class="login-shell">
     <div class="login-art">
       <div class="art-top"><span class="leaf-mark">✳</span><span>TROPICA <b>INDUSTRIES</b></span></div>
@@ -39,7 +40,7 @@
         </form>
         <div class="login-or"><span></span>OR<span></span></div>
         <button class="btn btn-outline full" id="adminDemo" type="button">Login as admin <span>→</span></button>
-        <div class="demo-note" id="loginMessage">Use the account and password assigned to you.</div>
+        <div class="demo-note" id="loginMessage" role="status" aria-live="polite" aria-busy="false">Checking for a saved sign-in…</div>
       </div>
       <p class="login-legal">© 2026 Tropica Industries. Internal business workspace.</p>
     </div>
@@ -133,7 +134,7 @@
         <div class="page-intro"><div><span class="eyebrow">PERFORMANCE INTELLIGENCE</span><h1>Reports & downloads</h1><p class="muted">Review monthly performance and export the data you need.</p></div><div class="period-control"><span>Report year</span><select id="reportYear"></select></div></div>
         <div class="report-kpis stat-grid">
           <article class="stat-card"><div class="stat-top"><span>Sales this year</span><span class="stat-icon green">₣</span></div><div class="stat-value" id="salesThisYear">—</div><div class="stat-foot"><span class="positive">Published records</span><span>year to date</span></div></article>
-          <article class="stat-card"><div class="stat-top"><span>Target achievement</span><span class="stat-icon blue">◎</span></div><div class="stat-value" id="annualTargetProgress">—</div><div class="stat-foot"><span class="neutral">November target</span><span>current month</span></div></article>
+          <article class="stat-card"><div class="stat-top"><span>Target achievement</span><span class="stat-icon blue">◎</span></div><div class="stat-value" id="annualTargetProgress">—</div><div class="stat-foot"><span class="neutral">Current month target</span><span>selected report year</span></div></article>
           <article class="stat-card"><div class="stat-top"><span>Best month</span><span class="stat-icon amber">☆</span></div><div class="stat-value" id="bestMonth">—</div><div class="stat-foot"><span class="positive" id="bestMonthSales">—</span><span>recorded sales</span></div></article>
           <article class="stat-card"><div class="stat-top"><span>Reports available</span><span class="stat-icon purple">▤</span></div><div class="stat-value" id="reportCount">11</div><div class="stat-foot"><span class="neutral">Jan – Nov 2026</span><span>monthly reports</span></div></article>
         </div>

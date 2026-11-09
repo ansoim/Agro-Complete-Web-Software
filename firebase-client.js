@@ -1,11 +1,12 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
+import { browserLocalPersistence, getAuth, onAuthStateChanged, setPersistence, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
 import { getFirestore, collection, doc, getDoc, getDocs, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const persistenceReady = setPersistence(auth, browserLocalPersistence).then(() => null, error => error);
 
 async function readCollection(name) {
   const snapshot = await getDocs(collection(db, name));
@@ -35,6 +36,7 @@ async function loadState() {
     people: salespeople.map(person => ({ ...person, sales: 0, target: Number(person.target) || 0 })),
     entries: salesEntries.map(entry => ({ ...entry, person: entry.person || byId.get(entry.salespersonId)?.name || "", qty: entry.quantity ?? entry.qty, published: entry.published ?? entry.status === "published" })),
     salesSnapshots: salesSnapshots.map(row => ({ ...row, salespersonName: row.salespersonName || byId.get(row.salespersonId)?.name || row.salespersonId, amount: Number(row.amount) || 0 })),
+    teamTargets: Object.fromEntries(monthlyTargets.map(row => [row.month || row.id, Number(row.teamTarget) || 0]).filter(([month]) => /^\d{4}-\d{2}$/.test(month))),
     teamTarget: Number(monthlyTargets.find(row => row.month === "2026-11")?.teamTarget) || 0,
     annualSalesData
   };
@@ -55,12 +57,12 @@ async function replaceCollection(name, records) {
 }
 
 async function saveState(state) {
-  if (auth.currentUser) {
-    const profile = await loadProfile(auth.currentUser.uid);
-    if (profile?.role !== "admin") throw new Error("Only an administrator can change business records.");
-  }
+  if (!auth.currentUser) throw new Error("Sign in before saving business records.");
+  const profile = await loadProfile(auth.currentUser.uid);
+  if (profile?.role !== "admin" || profile.active === false) throw new Error("Only an active administrator can change business records.");
   const snapshots = state.salesSnapshots.map(row => ({ ...row, id: `${row.month}_${row.salespersonId}` }));
-  const targets = [{ id: "2026-11", month: "2026-11", teamTarget: Number(state.teamTarget) || 0 }];
+  const targetMap = state.teamTargets || { "2026-11": state.teamTarget };
+  const targets = Object.entries(targetMap).map(([month, teamTarget]) => ({ id: month, month, teamTarget: Number(teamTarget) || 0 }));
   const annualReports = (state.annualSalesData?.months || []).map((row, index) => ({
     id: String(row.month || String(index + 1).padStart(2, "0")).slice(-2), month: String(row.month || String(index + 1).padStart(2, "0")).slice(-2),
     agro: row.agro || {}, chemical: row.chemical || {}, oil: row.oil || {}, total: row.total || {}
@@ -79,6 +81,6 @@ async function saveAdminProfile(profile) {
 
 window.tropicaFirebase = {
   auth, db, signIn: (email, password) => signInWithEmailAndPassword(auth, email, password),
-  signOut: () => signOut(auth), onAuthStateChanged: callback => onAuthStateChanged(auth, callback),
+  ready: persistenceReady, signOut: () => signOut(auth), onAuthStateChanged: (callback, onError) => onAuthStateChanged(auth, callback, onError),
   loadProfile, loadState, saveState, saveAdminProfile
 };

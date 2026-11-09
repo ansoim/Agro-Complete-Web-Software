@@ -35,7 +35,14 @@
 .employee-leader-table{border-collapse:separate;border-spacing:0}
 .employee-leader-table thead th{position:sticky;top:0;z-index:5;background:#10272d;box-shadow:0 1px 0 rgba(255,255,255,.12)}
 @media(max-width:520px){.welcome-row .period-control{justify-content:flex-start;flex-wrap:wrap}.welcome-row .period-control select{flex:1;min-width:115px}}
-@media(prefers-reduced-motion:reduce){.chart-point{animation:none}} html.auth-pending #loginView {
+@media(prefers-reduced-motion:reduce){.chart-point{animation:none}}
+.login-card button:disabled{cursor:wait;opacity:.72}
+.demo-note.is-loading{display:flex;align-items:center;gap:9px;color:#356c49}
+.demo-note.is-loading:before{content:"";width:13px;height:13px;flex:none;border:2px solid #b8d7c1;border-top-color:#218653;border-radius:50%;animation:login-spin .75s linear infinite}
+.demo-note.is-error{background:#fff1ef;color:#a43d31}
+@keyframes login-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.demo-note.is-loading:before{animation:none;border-top-color:#b8d7c1}}
+html.auth-pending #loginView {
   visibility: hidden;
 }
 
@@ -74,5 +81,6 @@
 @media (prefers-reduced-motion: reduce) {
   .auth-loading-spinner {
     animation: none;
+    border-top-color: #b8d7c1;
   }
 }
