@@ -46,6 +46,12 @@ html.auth-pending #loginView {
   visibility: hidden;
 }
 
+.leaf-mark {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
 .auth-loading {
   position: fixed;
   inset: 0;
