@@ -16,7 +16,7 @@ let user={name:adminProfile.name,role:'employee'};
 let rowCounter=0;
 let editingEntryId=null;
 let annualSalesData=null,showPreviousYear=false;
-let signedInProfile=null,loginMode='employee',saveQueue=Promise.resolve();
+let signedInProfile=null,loginMode='employee',pendingLoginMode=null,authStateReady=false,authLoadId=0,saveQueue=Promise.resolve();
 function save(){if(user.role!=='admin'||!window.tropicaFirebase||!signedInProfile)return;const state={people,entries,salesSnapshots,teamTarget,annualSalesData};saveQueue=saveQueue.then(()=>window.tropicaFirebase.saveState(state)).catch(error=>{console.error(error);toast('Cloud save failed. Check your connection and permissions.')})}
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),2600)}
 function fillMonths(sel,includeAll=false){sel.innerHTML='';if(includeAll){let o=document.createElement('option');o.value='all';o.textContent='All months';sel.append(o)}for(let i=0;i<=currentMonth;i++){let o=document.createElement('option');o.value=`${currentYear}-${String(i+1).padStart(2,'0')}`;o.textContent=monthNames[i]+' '+currentYear;sel.append(o)}sel.value=`${currentYear}-${String(currentMonth+1).padStart(2,'0')}`}
@@ -29,7 +29,38 @@ function activePeople(){return people.filter(p=>p.active!==false)}
 function fillSalespeople(){const select=$('#salesperson'),selected=select.value;select.innerHTML=activePeople().map(p=>`<option value="${p.name}">${p.name}</option>`).join('');if(activePeople().some(p=>p.name===selected))select.value=selected}
 async function init(){['overviewMonth','targetMonth','employeeMonth','reportMonth'].forEach(id=>fillMonths($('#'+id),id==='reportMonth'));$('#overviewMonth').value=snapshotMonth;$('#targetMonth').value=snapshotMonth;$('#employeeMonth').value=snapshotMonth;$('#reportMonth').value=snapshotMonth;$('#saleDate').value=new Date().toISOString().slice(0,10);fillSalespeople();addProductRow();renderAll();$('#targetAmount').value=teamTarget;applyAdminProfile()}
 function login(role,name){user={name:name||'Salesperson',role};$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');$('#appView').classList.toggle('employee-mode',role==='employee');$('#adminNav').classList.toggle('hidden',role!=='admin');$('#employeeNav').classList.toggle('hidden',role==='admin');$('#userName').textContent=user.name;$('#userRole').textContent=role==='admin'?'Administrator':'Sales Executive';setAvatar(user.name,role==='admin'?adminProfile.photo:'');$('#welcomeName').textContent=user.name.split(' ')[0];showPage(role==='admin'?'overview':'employee');renderAll();$('#sidebar').classList.remove('open')}
-async function signInWithFirebase(){const email=$('#loginEmail').value.trim(),password=$('#loginPassword').value;try{const credential=await window.tropicaFirebase.signIn(email,password),profile=await window.tropicaFirebase.loadProfile(credential.user.uid);if(!profile||profile.active===false||!['admin','employee'].includes(profile.role)){await window.tropicaFirebase.signOut();throw new Error('This account is not assigned an active dashboard role. Ask the administrator to configure it.')}if(profile.role!==loginMode){await window.tropicaFirebase.signOut();throw new Error(`This account is not set up for ${loginMode} access.`)}signedInProfile={...profile,uid:credential.user.uid};adminProfile={...adminProfile,name:profile.role==='admin'?(profile.displayName||'Jaykishan Tolani'):adminProfile.name,photo:profile.photo||adminProfile.photo};const cloud=await window.tropicaFirebase.loadState();people=cloud.people;entries=cloud.entries;salesSnapshots=cloud.salesSnapshots;teamTarget=cloud.teamTarget||0;annualSalesData=cloud.annualSalesData;fillSalespeople();renderAll();login(profile.role,profile.displayName||profile.name||email.split('@')[0]);$('#loginPassword').value=''}catch(error){console.error(error);toast(error.message||'Unable to sign in. Check your account and password.')}}
+async function restoreFirebaseSession(authUser){
+  const loadId=++authLoadId;
+  if(!authUser){
+    const hadSession=!!signedInProfile;
+    signedInProfile=null;
+    if(authStateReady&&hadSession){$('#appView').classList.add('hidden');$('#appView').classList.remove('employee-mode');$('#loginView').classList.remove('hidden')}
+    authStateReady=true;
+    return;
+  }
+  authStateReady=true;
+  const expectedRole=pendingLoginMode;
+  pendingLoginMode=null;
+  try{
+    const profile=await window.tropicaFirebase.loadProfile(authUser.uid);
+    if(!profile||profile.active===false||!['admin','employee'].includes(profile.role))throw new Error('This account is not assigned an active dashboard role. Ask the administrator to configure it.');
+    if(expectedRole&&profile.role!==expectedRole)throw new Error(`This account is not set up for ${expectedRole} access.`);
+    const cloud=await window.tropicaFirebase.loadState();
+    if(loadId!==authLoadId)return;
+    signedInProfile={...profile,uid:authUser.uid};
+    adminProfile={...adminProfile,name:profile.role==='admin'?(profile.displayName||'Jaykishan Tolani'):adminProfile.name,photo:profile.photo||adminProfile.photo};
+    people=cloud.people;entries=cloud.entries;salesSnapshots=cloud.salesSnapshots;teamTarget=cloud.teamTarget||0;annualSalesData=cloud.annualSalesData;
+    fillSalespeople();renderAll();
+    login(profile.role,profile.displayName||profile.name||authUser.email?.split('@')[0]);
+    $('#loginPassword').value='';
+  }catch(error){
+    if(loadId!==authLoadId)return;
+    console.error(error);
+    toast(error.message||'Unable to restore your dashboard session.');
+    await window.tropicaFirebase.signOut();
+  }
+}
+async function signInWithFirebase(){const email=$('#loginEmail').value.trim(),password=$('#loginPassword').value;pendingLoginMode=loginMode;try{await window.tropicaFirebase.signIn(email,password)}catch(error){pendingLoginMode=null;console.error(error);toast(error.message||'Unable to sign in. Check your account and password.')}}
 $('#loginForm').addEventListener('submit',e=>{e.preventDefault();signInWithFirebase()});
 $('#adminDemo').addEventListener('click',()=>{loginMode='admin';$('#employeeLoginSubmit').innerHTML='Continue as admin <span>→</span>';$('#loginMessage').textContent='Enter your administrator email and password, then continue.'});
 $('#employeeLoginSubmit').addEventListener('click',()=>{loginMode='employee';$('#employeeLoginSubmit').innerHTML='Login as employee <span>→</span>';$('#loginMessage').textContent='Enter your assigned employee email and password.'});
@@ -105,4 +136,4 @@ $('#adminProfileOpen').addEventListener('click',()=>{applyAdminProfile();$('#adm
 $('#adminProfilePhoto').addEventListener('change',e=>{const file=e.target.files?.[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{const img=new Image();img.onload=()=>{const scale=Math.min(1,320/Math.max(img.width,img.height)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.width*scale));canvas.height=Math.max(1,Math.round(img.height*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);adminProfile.photo=canvas.toDataURL('image/jpeg',.84);applyAdminProfile(false)};img.src=reader.result};reader.readAsDataURL(file)});
 $('#adminProfileForm').addEventListener('submit',async e=>{e.preventDefault();adminProfile.name=$('#adminProfileName').value.trim()||'Jaykishan Tolani';try{await window.tropicaFirebase.saveAdminProfile(adminProfile);if(signedInProfile)signedInProfile.displayName=adminProfile.name;if(user.role==='admin'){user.name=adminProfile.name;$('#welcomeName').textContent=user.name.split(' ')[0]}applyAdminProfile();$('#adminProfileDialog').close();toast('Administrator profile saved')}catch(error){toast(error.message||'Could not save administrator profile')}});
 
-window.addEventListener('DOMContentLoaded',()=>init());
+window.addEventListener('DOMContentLoaded',()=>{init();window.tropicaFirebase.onAuthStateChanged(restoreFirebaseSession)});
