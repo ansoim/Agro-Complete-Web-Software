@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="auth-pending">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,7 +10,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body> <div id="authLoading" class="auth-loading" role="status" aria-live="polite">
+  <span class="auth-loading-spinner" aria-hidden="true"></span>
+  <span>Checking your sign-in…</span>
+</div>
   <div id="loginView" class="login-shell">
     <div class="login-art">
       <div class="art-top"><span class="leaf-mark">✳</span><span>TROPICA <b>INDUSTRIES</b></span></div>
