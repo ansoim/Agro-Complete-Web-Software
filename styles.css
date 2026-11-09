@@ -35,4 +35,44 @@
 .employee-leader-table{border-collapse:separate;border-spacing:0}
 .employee-leader-table thead th{position:sticky;top:0;z-index:5;background:#10272d;box-shadow:0 1px 0 rgba(255,255,255,.12)}
 @media(max-width:520px){.welcome-row .period-control{justify-content:flex-start;flex-wrap:wrap}.welcome-row .period-control select{flex:1;min-width:115px}}
-@media(prefers-reduced-motion:reduce){.chart-point{animation:none}}
+@media(prefers-reduced-motion:reduce){.chart-point{animation:none}} html.auth-pending #loginView {
+  visibility: hidden;
+}
+
+.auth-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #fff;
+  color: #356c49;
+  font-size: 14px;
+}
+
+.auth-loading.hidden {
+  display: none;
+}
+
+.auth-loading-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #b8d7c1;
+  border-top-color: #218653;
+  border-radius: 50%;
+  animation: auth-loading-spin .75s linear infinite;
+}
+
+@keyframes auth-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-loading-spinner {
+    animation: none;
+  }
+}
