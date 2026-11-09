@@ -152,4 +152,39 @@ $('#adminProfileOpen').addEventListener('click',()=>{applyAdminProfile();$('#adm
 $('#adminProfilePhoto').addEventListener('change',e=>{const file=e.target.files?.[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{const img=new Image();img.onload=()=>{const scale=Math.min(1,320/Math.max(img.width,img.height)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.width*scale));canvas.height=Math.max(1,Math.round(img.height*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);adminProfile.photo=canvas.toDataURL('image/jpeg',.84);applyAdminProfile(false)};img.src=reader.result};reader.readAsDataURL(file)});
 $('#adminProfileForm').addEventListener('submit',async e=>{e.preventDefault();adminProfile.name=$('#adminProfileName').value.trim()||'Jaykishan Tolani';try{await window.tropicaFirebase.saveAdminProfile(adminProfile);if(signedInProfile)signedInProfile.displayName=adminProfile.name;if(user.role==='admin'){user.name=adminProfile.name;$('#welcomeName').textContent=user.name.split(' ')[0]}applyAdminProfile();$('#adminProfileDialog').close();toast('Administrator profile saved')}catch(error){toast(error.message||'Could not save administrator profile')}});
 
-window.addEventListener('DOMContentLoaded',()=>{init();window.tropicaFirebase.onAuthStateChanged(restoreFirebaseSession)});
+window.addEventListener('DOMContentLoaded', async () => {
+  setLoginStatus('Checking for a saved sign-in…', true);
+
+  try {
+    await init();
+
+    if (!window.tropicaFirebase) {
+      throw new Error('Firebase could not be initialized. Reload the page and try again.');
+    }
+
+    const persistenceError = await window.tropicaFirebase.ready;
+    if (persistenceError) {
+      console.warn('Persistent sign-in is unavailable in this browser.', persistenceError);
+      persistenceWarning = 'This browser could not save your sign-in. You may need to sign in again after refreshing.';
+    }
+
+    window.tropicaFirebase.onAuthStateChanged(
+      restoreFirebaseSession,
+      error => {
+        console.error(error);
+        authStateReady = true;
+        const message = authErrorMessage(error);
+        setLoginStatus(message, false, true);
+        finishAuthStartup();
+        toast(message);
+      }
+    );
+  } catch (error) {
+    console.error(error);
+    authStateReady = true;
+    const message = authErrorMessage(error);
+    setLoginStatus(message, false, true);
+    finishAuthStartup();
+    toast(message);
+  }
+});
