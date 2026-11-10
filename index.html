@@ -1,19 +1,19 @@
 <!doctype html>
-<html lang="en" class="auth-pending">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0d3026">
   <title>Tropica Industries | Agro Sales Dashboard</title>
+  <script>try{if(localStorage.getItem('tropica.auth-session')==='1')document.documentElement.classList.add('auth-pending')}catch{}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="authLoading" class="auth-loading" role="status" aria-live="polite">
+  <div id="authLoading" class="auth-loading" role="status" aria-label="Restoring your session">
     <span class="auth-loading-spinner" aria-hidden="true"></span>
-    <span>Checking your sign-in…</span>
   </div>
   <div id="loginView" class="login-shell">
     <div class="login-art">
@@ -41,7 +41,7 @@
         </form>
         <div class="login-or"><span></span>OR<span></span></div>
         <button class="btn btn-outline full" id="adminDemo" type="button">Login as admin <span>→</span></button>
-        <div class="demo-note" id="loginMessage" role="status" aria-live="polite" aria-busy="false">Checking for a saved sign-in…</div>
+        <div class="demo-note" id="loginMessage" role="status" aria-live="polite" aria-busy="false">Use the account and password assigned to you.</div>
       </div>
       <p class="login-legal">© 2026 Tropica Industries. Internal business workspace.</p>
     </div>
@@ -100,7 +100,7 @@
       </section>
 
       <section id="entryPage" class="page">
-        <div class="page-intro"><div><span class="eyebrow">ADMIN WORKSPACE</span><h1>Daily sales entry</h1><p class="muted">Record sales, manage monthly targets and publish updates to the team.</p><p class="micro-note">November totals include the supplied month-to-date snapshot. Avoid entering transactions already included in that snapshot.</p></div><div class="draft-status"><i></i> Changes save in this browser</div></div>
+        <div class="page-intro"><div><span class="eyebrow">ADMIN WORKSPACE</span><h1>Daily sales entry</h1><p class="muted">Record sales, manage monthly targets and publish updates to the team.</p><p class="micro-note">November totals include the supplied month-to-date snapshot. Avoid entering transactions already included in that snapshot.</p></div><div class="draft-status"><i></i> Changes sync to Firebase</div></div>
         <div class="entry-layout">
           <div class="entry-main">
             <article class="panel"><div class="panel-head"><div><h3>Sales entry form</h3><p>Add one or more product sales for a salesperson</p></div><span class="step-tag">01 / ENTRY</span></div>

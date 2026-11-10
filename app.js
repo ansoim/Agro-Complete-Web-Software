@@ -18,8 +18,12 @@ let rowCounter=0;
 let editingEntryId=null;
 let annualSalesData=null,showPreviousYear=false;
 let reportingMonth='';
-let signedInProfile=null,loginMode='employee',pendingLoginMode=null,authStateReady=false,authLoadId=0,persistenceWarning='',saveQueue=Promise.resolve();
-function save(){if(user.role!=='admin'||!window.tropicaFirebase||!signedInProfile)return;const state={people,entries,salesSnapshots,teamTarget,teamTargets,annualSalesData};saveQueue=saveQueue.then(()=>window.tropicaFirebase.saveState(state)).catch(error=>{console.error(error);toast('Cloud save failed. Check your connection and permissions.')})}
+let signedInProfile=null,loginMode='employee',pendingLoginMode=null,authStateReady=false,authLoadId=0,persistenceWarning='',saveQueue=Promise.resolve(),lastSyncedState=null,stateUnsubscribe=null,deferredCloudState=null,savesInFlight=0,localEditsPending=false,sessionExpiryTimer=null,sessionExpiryAt=0,sessionExpired=false;
+const sessionMaxAgeMs=8*60*60*1000;
+function currentState(){return {people,entries,salesSnapshots,teamTarget,teamTargets,annualSalesData}}
+function copyState(state){return JSON.parse(JSON.stringify(state))}
+function applyCloudState(cloud,render=true){people=cloud.people;entries=cloud.entries;salesSnapshots=cloud.salesSnapshots;teamTargets=cloud.teamTargets||{};teamTarget=cloud.teamTarget||0;annualSalesData=cloud.annualSalesData;lastSyncedState=copyState(cloud);fillSalespeople();fillTargetMonths($('#targetMonth'));$('#targetAmount').value=targetFor($('#targetMonth').value);$('#targetPreview').textContent=money($('#targetAmount').value);if(render)renderAll()}
+function save(){if(signedInProfile?.role!=='admin'||!window.tropicaFirebase||!lastSyncedState)return;const state=copyState(currentState());localEditsPending=true;savesInFlight++;const operation=saveQueue.then(async()=>{await window.tropicaFirebase.saveState(state,lastSyncedState);lastSyncedState=copyState(state);localEditsPending=false}).catch(error=>{console.error(error);localEditsPending=true;toast('Cloud save failed. Check your connection and permissions.')}).finally(()=>{savesInFlight--;if(!savesInFlight&&!localEditsPending&&deferredCloudState){const latest=deferredCloudState;deferredCloudState=null;applyCloudState(latest)}});saveQueue=operation}
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),2600)}
 function dataYears(){const years=new Set([currentYear,currentYear-1,...(annualSalesData?.years||[]).map(Number),...entries.map(e=>Number(e.date?.slice(0,4))),...salesSnapshots.map(s=>Number(s.month?.slice(0,4))),...Object.keys(teamTargets).map(month=>Number(month.slice(0,4)))]);(annualSalesData?.months||[]).forEach(month=>Object.keys(month.total||{}).forEach(year=>years.add(Number(year))));return [...years].filter(year=>Number.isInteger(year)&&year>1900&&year<10000).sort((a,b)=>b-a)}
 function annualDataYears(){const years=new Set((annualSalesData?.years||[]).map(Number));(annualSalesData?.months||[]).forEach(month=>Object.keys(month.total||{}).forEach(year=>years.add(Number(year))));return years}
@@ -30,6 +34,7 @@ function fillMonths(sel,includeAll=false){const previous=sel.value;sel.innerHTML
 function selectedOverviewMonth(){return `${$('#overviewYear').value}-${$('#overviewMonth').value}`}
 function targetFor(month){return Number(teamTargets[month]??(month===snapshotMonth?teamTarget:0))||0}
 function monthEntries(month, publishedOnly=false){return entries.filter(e=>(!month||month==='all'||e.date.startsWith(month))&&(!publishedOnly||e.published))}
+function personSalesForMonth(month,publishedOnly=true){const totals=new Map();for(const entry of entries){if((!month||entry.date.startsWith(month))&&(!publishedOnly||entry.published))totals.set(entry.person,(totals.get(entry.person)||0)+Number(entry.value||0))}return totals}
 function baselineForPerson(month,person){if(month!==snapshotMonth)return 0;const row=salesSnapshots.find(s=>s.month===month&&s.salespersonId===person.id);return Number(row?.amount??person.sales)||0}
 function baselineTotal(month){return month===snapshotMonth?salesSnapshots.filter(s=>s.month===month).reduce((a,s)=>a+(Number(s.amount)||0),0):0}
 function totalFor(month,publishedOnly=false){return baselineTotal(month)+monthEntries(month,publishedOnly).reduce((a,e)=>a+Number(e.value),0)}
@@ -37,43 +42,93 @@ function datePretty(d){return new Date(d+'T00:00:00').toLocaleDateString('en-IN'
 function activePeople(){return people.filter(p=>p.active!==false)}
 function refreshCurrentPeriod(){now=new Date();currentMonth=now.getMonth();currentYear=now.getFullYear()}
 function fillSalespeople(){const select=$('#salesperson'),selected=select.value;select.innerHTML=activePeople().map(p=>`<option value="${p.name}">${p.name}</option>`).join('');if(activePeople().some(p=>p.name===selected))select.value=selected}
-async function init(){fillMonthNames($('#overviewMonth'));fillYears($('#overviewYear'));fillTargetMonths($('#targetMonth'));fillMonths($('#reportMonth'),true);fillYears($('#reportYear'));fillYears($('#chartYear'));$('#overviewMonth').value=String(currentMonth+1).padStart(2,'0');$('#overviewYear').value=String(currentYear);$('#targetMonth').value=`${currentYear}-${String(currentMonth+1).padStart(2,'0')}`;$('#reportMonth').value=snapshotMonth;$('#chartYear').value=String(currentYear);$('#saleDate').value=new Date().toISOString().slice(0,10);fillSalespeople();addProductRow();renderAll();$('#targetAmount').value=targetFor($('#targetMonth').value);applyAdminProfile()}
+async function init(){fillMonthNames($('#overviewMonth'));fillYears($('#overviewYear'));fillTargetMonths($('#targetMonth'));fillMonths($('#reportMonth'),true);fillYears($('#reportYear'));fillYears($('#chartYear'));$('#overviewMonth').value=String(currentMonth+1).padStart(2,'0');$('#overviewYear').value=String(currentYear);$('#targetMonth').value=`${currentYear}-${String(currentMonth+1).padStart(2,'0')}`;$('#reportMonth').value=snapshotMonth;$('#chartYear').value=String(currentYear);$('#saleDate').value=new Date().toISOString().slice(0,10);fillSalespeople();addProductRow();$('#targetAmount').value=targetFor($('#targetMonth').value);applyAdminProfile()}
 function login(role,name,resetPeriod=true){if(resetPeriod){refreshCurrentPeriod();$('#overviewMonth').value=String(currentMonth+1).padStart(2,'0');$('#overviewYear').value=String(currentYear);$('#chartYear').value=String(currentYear);$('#reportYear').value=String(currentYear);reportingMonth=`${currentYear}-${String(currentMonth+1).padStart(2,'0')}`;showPreviousYear=false}user={name:name||'Salesperson',role};$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');$('#appView').classList.toggle('employee-mode',role==='employee');$('#adminNav').classList.toggle('hidden',role!=='admin');$('#employeeNav').classList.toggle('hidden',role==='admin');$('#userName').textContent=user.name;$('#userRole').textContent=role==='admin'?'Administrator':'Sales Executive';setAvatar(user.name,role==='admin'?adminProfile.photo:'');$('#welcomeName').textContent=user.name.split(' ')[0];showPage(role==='admin'?'overview':'employee');renderAll();$('#sidebar').classList.remove('open')}
 function setLoginStatus(message,busy=false,error=false){const status=$('#loginMessage');status.textContent=message;status.classList.toggle('is-loading',busy);status.classList.toggle('is-error',error);status.setAttribute('aria-busy',String(busy));$('#employeeLoginSubmit').disabled=busy;$('#adminDemo').disabled=busy;$('#togglePassword').disabled=busy}
 function authErrorMessage(error){const messages={'auth/invalid-credential':'The email or password is incorrect.','auth/user-not-found':'No account exists for this email.','auth/wrong-password':'The email or password is incorrect.','auth/too-many-requests':'Too many sign-in attempts. Please wait and try again.','auth/network-request-failed':'Network connection failed. Check your connection and try again.','permission-denied':'You are signed in, but dashboard data could not be loaded. Check Firestore access and try again.'};return messages[error?.code]||error?.message||'Unable to sign in. Check your connection and account details.'}
 let authStartupTimeout;
 function finishAuthStartup(){clearTimeout(authStartupTimeout);document.documentElement.classList.remove('auth-pending');$('#authLoading')?.classList.add('hidden')}
+function clearSessionTimer(){clearTimeout(sessionExpiryTimer);sessionExpiryTimer=null;sessionExpiryAt=0}
+async function expireSession(){if(!signedInProfile)return;clearSessionTimer();sessionExpired=true;try{await window.tropicaFirebase.signOut()}catch(error){console.error('Could not complete automatic sign-out.',error)}finally{stateUnsubscribe?.();stateUnsubscribe=null;signedInProfile=null;lastSyncedState=null;document.documentElement.classList.remove('auth-pending');$('#authLoading')?.classList.add('hidden');$('#appView').classList.add('hidden');$('#appView').classList.remove('employee-mode');$('#loginView').classList.remove('hidden');setLoginMode('employee');setLoginStatus('Your session expired after 8 hours. Please sign in again.');toast('You have been signed out after 8 hours.')}}
+function scheduleSessionExpiry(authTime){const signedInAt=Date.parse(authTime);if(!Number.isFinite(signedInAt))return;sessionExpiryAt=signedInAt+sessionMaxAgeMs;if(sessionExpiryAt<=Date.now()){expireSession();return}clearTimeout(sessionExpiryTimer);sessionExpiryTimer=setTimeout(expireSession,Math.min(sessionExpiryAt-Date.now(),2147483647))}
+function checkSessionExpiry(){if(signedInProfile&&sessionExpiryAt&&Date.now()>=sessionExpiryAt)expireSession()}
+window.addEventListener('focus',checkSessionExpiry);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkSessionExpiry()});
+function pruneExpiredBusinessData(){
+  if(signedInProfile?.role!=='admin')return false;
+  const cutoff=new Date(Date.now()-365*24*60*60*1000).toISOString().slice(0,10),cutoffMonth=cutoff.slice(0,7),minimumYear=currentYear-1;
+  const beforeAnnual=JSON.stringify(annualSalesData),oldEntryCount=entries.length,oldSnapshotCount=salesSnapshots.length,oldTargetCount=Object.keys(teamTargets).length,oldTeamTarget=teamTarget;
+  entries=entries.filter(entry=>entry.date>=cutoff);
+  salesSnapshots=salesSnapshots.filter(row=>row.month>=cutoffMonth);
+  teamTargets=Object.fromEntries(Object.entries(teamTargets).filter(([month])=>month>=cutoffMonth));
+  if(snapshotMonth<cutoffMonth)teamTarget=0;
+  if(annualSalesData){
+    const trimYears=value=>Object.fromEntries(Object.entries(value||{}).filter(([year])=>!/^\d{4}$/.test(year)||Number(year)>=minimumYear));
+    annualSalesData={...annualSalesData,years:(annualSalesData.years||[]).filter(year=>Number(year)>=minimumYear),months:(annualSalesData.months||[]).map(row=>({...row,agro:trimYears(row.agro),chemical:trimYears(row.chemical),oil:trimYears(row.oil),total:trimYears(row.total)}))};
+  }
+  const removed=entries.length!==oldEntryCount||salesSnapshots.length!==oldSnapshotCount||Object.keys(teamTargets).length!==oldTargetCount||teamTarget!==oldTeamTarget||JSON.stringify(annualSalesData)!==beforeAnnual;
+  return removed;
+}
 async function restoreFirebaseSession(authUser){
   const loadId=++authLoadId;
   if(!authUser){
     const hadSession=!!signedInProfile;
+    clearSessionTimer();
+    stateUnsubscribe?.();stateUnsubscribe=null;
     signedInProfile=null;
+    lastSyncedState=null;
+    localEditsPending=false;
+    deferredCloudState=null;
+    try{localStorage.removeItem('tropica.auth-session')}catch(error){console.warn('Could not clear the local session hint.',error)}
     if(authStateReady&&hadSession){$('#appView').classList.add('hidden');$('#appView').classList.remove('employee-mode');$('#loginView').classList.remove('hidden')}
     authStateReady=true;
-    if(!hadSession)setLoginStatus(persistenceWarning||'Use the account and password assigned to you.',false,!!persistenceWarning);
+    if(!hadSession)setLoginStatus(sessionExpired?'Your session expired after 8 hours. Please sign in again.':persistenceWarning||'Use the account and password assigned to you.',false,!!persistenceWarning);
+    sessionExpired=false;
     finishAuthStartup();
     return;
   }
   authStateReady=true;
-  setLoginStatus('Verifying your account and loading your dashboard…',true);
+  setLoginStatus('Signing you in…',true);
   const expectedRole=pendingLoginMode;
   pendingLoginMode=null;
   try{
+    const token=await authUser.getIdTokenResult();
+    const signedInAt=Date.parse(token.authTime);
+    if(Number.isFinite(signedInAt)&&Date.now()-signedInAt>=sessionMaxAgeMs){sessionExpired=true;await window.tropicaFirebase.signOut();setLoginStatus('Your session expired after 8 hours. Please sign in again.');finishAuthStartup();return}
     const profile=await window.tropicaFirebase.loadProfile(authUser.uid);
     if(!profile||profile.active!==true||!['admin','employee'].includes(profile.role))throw Object.assign(new Error('This account is not assigned an active dashboard role. Ask the administrator to configure it.'),{code:'auth/invalid-profile'});
     if(expectedRole&&profile.role!==expectedRole)throw Object.assign(new Error(`This account is not set up for ${expectedRole} access.`),{code:'auth/role-mismatch'});
-    const cloud=await window.tropicaFirebase.loadState();
-    if(loadId!==authLoadId)return;
     signedInProfile={...profile,uid:authUser.uid};
+    scheduleSessionExpiry(token.authTime);
+    if(!signedInProfile)return;
     adminProfile={...adminProfile,name:profile.role==='admin'?(profile.displayName||'Jaykishan Tolani'):adminProfile.name,photo:profile.photo||adminProfile.photo};
-    people=cloud.people;entries=cloud.entries;salesSnapshots=cloud.salesSnapshots;teamTargets=cloud.teamTargets||{};teamTarget=cloud.teamTarget||0;annualSalesData=cloud.annualSalesData;
-    fillSalespeople();fillTargetMonths($('#targetMonth'));$('#targetAmount').value=targetFor($('#targetMonth').value);$('#targetPreview').textContent=money($('#targetAmount').value);renderAll();
-    login(profile.role,profile.displayName||profile.name||authUser.email?.split('@')[0]);
-    $('#loginPassword').value='';
-    finishAuthStartup();
+    stateUnsubscribe?.();
+    let firstState=true;
+    const subscription=window.tropicaFirebase.subscribeState(cloud=>{
+      if(loadId!==authLoadId||window.tropicaFirebase.auth.currentUser?.uid!==authUser.uid)return;
+      if(firstState){
+        firstState=false;
+        applyCloudState(cloud,false);
+        const pruned=pruneExpiredBusinessData();
+        if(pruned)save();
+        try{localStorage.setItem('tropica.auth-session','1')}catch(error){console.warn('Could not store the local session hint.',error)}
+        login(profile.role,profile.displayName||profile.name||authUser.email?.split('@')[0]);
+        $('#loginPassword').value='';
+        finishAuthStartup();
+      }else if(savesInFlight||localEditsPending)deferredCloudState=cloud;
+      else applyCloudState(cloud);
+    },error=>{
+      console.error(error);
+      if(firstState)return;
+      toast('Live data refresh failed. Check your connection.');
+    });
+    stateUnsubscribe=subscription.unsubscribe;
+    await subscription.ready;
+    if(loadId!==authLoadId)return;
   }catch(error){
     if(loadId!==authLoadId)return;
     console.error(error);
+    stateUnsubscribe?.();stateUnsubscribe=null;
     if(error.code==='auth/invalid-profile'||error.code==='auth/role-mismatch'){
       try{await window.tropicaFirebase.signOut()}catch(signOutError){console.error('Could not sign out an account without dashboard access.',signOutError)}
     }
@@ -111,6 +166,7 @@ $('#overviewMonth').addEventListener('change',updateReportingPeriod);$('#overvie
 $('#entrySearch').addEventListener('input',renderEntry);$('#entryDateFilter').addEventListener('change',renderEntry);
 function renderAll(){fillMonthNames($('#overviewMonth'));fillYears($('#overviewYear'));fillTargetMonths($('#targetMonth'));fillMonths($('#reportMonth'),true);fillYears($('#reportYear'));fillYears($('#chartYear'));renderOverview();renderEntry();renderReports();renderEmployee()}
 function renderOverview(){const m=selectedOverviewMonth();reportingMonth=m;const total=totalFor(m,true),monthlyTarget=targetFor(m),pct=monthlyTarget?Math.min(100,total/monthlyTarget*100):0;$('#overviewTargetMonth').textContent=monthNames[Number(m.slice(5,7))-1]+' '+m.slice(0,4);$('#totalSalesPeriodLabel').textContent=m===snapshotMonth?'November snapshot':'Selected month';$('#totalSales').textContent=compact(total);$('#teamTarget').textContent=compact(monthlyTarget);$('#targetProgress').textContent=pct.toFixed(1)+'% achieved';$('#ringPercent').textContent=Math.round(pct)+'%';$('#ringAchieved').textContent=compact(total);$('#ringRemaining').textContent=compact(Math.max(0,monthlyTarget-total));$('#teamRing').style.background=`conic-gradient(#218653 0 ${pct}%,#e9f0eb ${pct}% 100%)`;$('#teamProgressBar').style.width=pct+'%';$('#targetCaption').textContent=compact(monthlyTarget)+' target';$('#activePeople').textContent=activePeople().length;$('#averageSale').textContent=money(Math.round(total/(new Date().getDate()||1)));const performers=activePeople().map(p=>({...p,actual:baselineForPerson(m,p)+entries.filter(e=>e.person===p.name&&e.published&&e.date.startsWith(m)).reduce((a,e)=>a+e.value,0)})).sort((a,b)=>b.actual-a.actual);$('#performerList').innerHTML=performers.slice(0,4).map((p,i)=>`<div class="performer-row"><span class="rank">${String(i+1).padStart(2,'0')}</span><span class="person-avatar">${p.name.split(' ').map(x=>x[0]).join('').slice(0,2)}</span><div class="person-name"><b>${p.name}</b><small>${p.region||'Sales team'}</small></div><div class="person-sales">${compact(p.actual)}<small>${p.target?Math.round(p.actual/p.target*100)+'% of target':m===snapshotMonth?'November snapshot':'No individual target set'}</small></div></div>`).join('');const recent=monthEntries(m,true).slice(0,4);$('#activityList').innerHTML=recent.map(e=>`<div class="activity-item"><div class="activity-left"><span class="activity-symbol">↗</span><div><b>${e.person}</b><small>${e.product} · ${datePretty(e.date)}</small></div></div><span class="activity-value">${money(e.value)}</span></div>`).join('')||'<p class="muted">No individual transaction records for this period yet.</p>';drawChart()}
+function renderOverview(){const m=selectedOverviewMonth(),monthlyEntries=monthEntries(m,true),salesByPerson=personSalesForMonth(m),total=baselineTotal(m)+monthlyEntries.reduce((sum,e)=>sum+Number(e.value||0),0),monthlyTarget=targetFor(m),pct=monthlyTarget?Math.min(100,total/monthlyTarget*100):0;$('#overviewTargetMonth').textContent=monthNames[Number(m.slice(5,7))-1]+' '+m.slice(0,4);$('#totalSalesPeriodLabel').textContent=m===snapshotMonth?'November snapshot':'Selected month';$('#totalSales').textContent=compact(total);$('#teamTarget').textContent=compact(monthlyTarget);$('#targetProgress').textContent=pct.toFixed(1)+'% achieved';$('#ringPercent').textContent=Math.round(pct)+'%';$('#ringAchieved').textContent=compact(total);$('#ringRemaining').textContent=compact(Math.max(0,monthlyTarget-total));$('#teamRing').style.background=`conic-gradient(#218653 0 ${pct}%,#e9f0eb ${pct}% 100%)`;$('#teamProgressBar').style.width=pct+'%';$('#targetCaption').textContent=compact(monthlyTarget)+' target';$('#activePeople').textContent=activePeople().length;$('#averageSale').textContent=money(Math.round(total/(new Date().getDate()||1)));const performers=activePeople().map(p=>({...p,actual:baselineForPerson(m,p)+(salesByPerson.get(p.name)||0)})).sort((a,b)=>b.actual-a.actual);$('#performerList').innerHTML=performers.slice(0,4).map((p,i)=>`<div class="performer-row"><span class="rank">${String(i+1).padStart(2,'0')}</span><span class="person-avatar">${p.name.split(' ').map(x=>x[0]).join('').slice(0,2)}</span><div class="person-name"><b>${p.name}</b><small>${p.region||'Sales team'}</small></div><div class="person-sales">${compact(p.actual)}<small>${p.target?Math.round(p.actual/p.target*100)+'% of target':m===snapshotMonth?'November snapshot':'No individual target set'}</small></div></div>`).join('');$('#activityList').innerHTML=monthlyEntries.slice(0,4).map(e=>`<div class="activity-item"><div class="activity-left"><span class="activity-symbol">↗</span><div><b>${e.person}</b><small>${e.product} · ${datePretty(e.date)}</small></div></div><span class="activity-value">${money(e.value)}</span></div>`).join('')||'<p class="muted">No individual transaction records for this period yet.</p>';drawChart()}
 function chartMonthIndex(value){const numeric=Number(value);if(numeric>=1&&numeric<=12)return numeric-1;return monthNames.findIndex(name=>name.toLowerCase().startsWith(String(value||'').slice(0,3).toLowerCase()))}
 function chartSeries(year){if(annualDataYears().has(year)){const values=Array(12).fill(null);(annualSalesData?.months||[]).forEach(row=>{const index=chartMonthIndex(row.month),raw=row.total?.[String(year)],value=Number(raw);if(index>=0&&raw!==undefined&&raw!==null&&raw!==''&&Number.isFinite(value))values[index]=value});return {values,currency:annualSalesData.currency||'INR'}}
  const recorded=entries.filter(entry=>Number(entry.date?.slice(0,4))===year).map(entry=>Number(entry.date.slice(5,7))),snapshotMonths=salesSnapshots.filter(row=>Number(row.month?.slice(0,4))===year).map(row=>Number(row.month.slice(5,7))),lastMonth=year===currentYear?currentMonth+1:Math.max(0,...recorded,...snapshotMonths),values=Array(12).fill(null);for(let index=0;index<lastMonth;index++)values[index]=totalFor(`${year}-${String(index+1).padStart(2,'0')}`,true);return {values,currency:'FCFA'}}
@@ -136,8 +192,10 @@ function employeeTrophy(rank){const palettes={1:['#fff1b4','#d6a949','#6c4616'],
 function renderEmployee(){
  const m=reportingMonth||selectedOverviewMonth();
  const published=monthEntries(m,true);
+ const entriesByPerson=new Map();
+ for(const entry of published){if(!entriesByPerson.has(entry.person))entriesByPerson.set(entry.person,[]);entriesByPerson.get(entry.person).push(entry)}
  const ranked=activePeople().map(person=>{
-  const personEntries=published.filter(e=>e.person===person.name);
+  const personEntries=entriesByPerson.get(person.name)||[];
   const actual=baselineForPerson(m,person)+personEntries.reduce((sum,e)=>sum+Number(e.value||0),0);
   const closed=personEntries.filter(e=>!e.status||/closed|done|won/i.test(e.status)).length;
   const awaiting=personEntries.filter(e=>/await|feedback|follow/i.test(e.status||'')).length;
@@ -169,11 +227,12 @@ $('#adminProfilePhoto').addEventListener('change',e=>{const file=e.target.files?
 $('#adminProfileForm').addEventListener('submit',async e=>{e.preventDefault();adminProfile.name=$('#adminProfileName').value.trim()||'Jaykishan Tolani';try{await window.tropicaFirebase.saveAdminProfile(adminProfile);if(signedInProfile)signedInProfile.displayName=adminProfile.name;if(user.role==='admin'){user.name=adminProfile.name;$('#welcomeName').textContent=user.name.split(' ')[0]}applyAdminProfile();$('#adminProfileDialog').close();toast('Administrator profile saved')}catch(error){toast(error.message||'Could not save administrator profile')}});
 
 window.addEventListener('DOMContentLoaded', async () => {
-  setLoginStatus('Checking for a saved sign-in…', true);
-  authStartupTimeout = setTimeout(() => {
-    finishAuthStartup();
-    setLoginStatus('Firebase is taking longer than usual. You can try signing in.', false, true);
-  }, 12000);
+  if(document.documentElement.classList.contains('auth-pending')){
+    authStartupTimeout=setTimeout(()=>{
+      finishAuthStartup();
+      setLoginStatus('Session restoration is taking longer than usual. You can sign in below.',false,true);
+    },10000);
+  }
 
   try {
     await init();
