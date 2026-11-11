@@ -56,13 +56,14 @@ html.auth-pending #loginView {
   position: fixed;
   inset: 0;
   z-index: 10000;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
-  gap: 12px;
   background: #fff;
-  color: #356c49;
-  font-size: 14px;
+}
+
+html.auth-pending .auth-loading {
+  display: flex;
 }
 
 .auth-loading.hidden {

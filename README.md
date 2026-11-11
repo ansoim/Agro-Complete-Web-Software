@@ -22,6 +22,9 @@ Upload the frontend files and `assets` folder to the repository root with `index
 
 - Admin and employee sign-in through Firebase Authentication.
 - Shared salespeople, sales entries, snapshots, monthly targets and annual reports in Firestore.
+- Live Firestore listeners keep signed-in dashboards up to date across devices.
+- Sessions expire eight hours after authentication; Firestore Rules reject older auth sessions.
+- Saves write only changed Firestore documents instead of rereading and replacing whole collections.
 - Admin sales entry, editing, XLSX exports and JSON import/backup.
 - Employee leaderboard and rotating trophy podium.
 - `firestore.rules` denies access unless the signed-in account has an active role profile.
