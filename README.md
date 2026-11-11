@@ -24,7 +24,6 @@ Upload the frontend files and `assets` folder to the repository root with `index
 - Shared salespeople, sales entries, snapshots, monthly targets and annual reports in Firestore.
 - Live Firestore listeners keep signed-in dashboards up to date across devices.
 - Sessions expire eight hours after authentication; Firestore Rules reject older auth sessions.
-- Sales history older than one rolling year is pruned when an administrator loads the dashboard. This client-side cleanup runs only when an admin signs in; unattended scheduled cleanup requires a separately configured backend job.
 - Saves write only changed Firestore documents instead of rereading and replacing whole collections.
 - Admin sales entry, editing, XLSX exports and JSON import/backup.
 - Employee leaderboard and rotating trophy podium.

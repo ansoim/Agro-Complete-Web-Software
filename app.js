@@ -54,21 +54,6 @@ function scheduleSessionExpiry(authTime){const signedInAt=Date.parse(authTime);i
 function checkSessionExpiry(){if(signedInProfile&&sessionExpiryAt&&Date.now()>=sessionExpiryAt)expireSession()}
 window.addEventListener('focus',checkSessionExpiry);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkSessionExpiry()});
-function pruneExpiredBusinessData(){
-  if(signedInProfile?.role!=='admin')return false;
-  const cutoff=new Date(Date.now()-365*24*60*60*1000).toISOString().slice(0,10),cutoffMonth=cutoff.slice(0,7),minimumYear=currentYear-1;
-  const beforeAnnual=JSON.stringify(annualSalesData),oldEntryCount=entries.length,oldSnapshotCount=salesSnapshots.length,oldTargetCount=Object.keys(teamTargets).length,oldTeamTarget=teamTarget;
-  entries=entries.filter(entry=>entry.date>=cutoff);
-  salesSnapshots=salesSnapshots.filter(row=>row.month>=cutoffMonth);
-  teamTargets=Object.fromEntries(Object.entries(teamTargets).filter(([month])=>month>=cutoffMonth));
-  if(snapshotMonth<cutoffMonth)teamTarget=0;
-  if(annualSalesData){
-    const trimYears=value=>Object.fromEntries(Object.entries(value||{}).filter(([year])=>!/^\d{4}$/.test(year)||Number(year)>=minimumYear));
-    annualSalesData={...annualSalesData,years:(annualSalesData.years||[]).filter(year=>Number(year)>=minimumYear),months:(annualSalesData.months||[]).map(row=>({...row,agro:trimYears(row.agro),chemical:trimYears(row.chemical),oil:trimYears(row.oil),total:trimYears(row.total)}))};
-  }
-  const removed=entries.length!==oldEntryCount||salesSnapshots.length!==oldSnapshotCount||Object.keys(teamTargets).length!==oldTargetCount||teamTarget!==oldTeamTarget||JSON.stringify(annualSalesData)!==beforeAnnual;
-  return removed;
-}
 async function restoreFirebaseSession(authUser){
   const loadId=++authLoadId;
   if(!authUser){
@@ -109,8 +94,6 @@ async function restoreFirebaseSession(authUser){
       if(firstState){
         firstState=false;
         applyCloudState(cloud,false);
-        const pruned=pruneExpiredBusinessData();
-        if(pruned)save();
         try{localStorage.setItem('tropica.auth-session','1')}catch(error){console.warn('Could not store the local session hint.',error)}
         login(profile.role,profile.displayName||profile.name||authUser.email?.split('@')[0]);
         $('#loginPassword').value='';
